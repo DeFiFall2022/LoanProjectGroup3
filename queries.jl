@@ -1,6 +1,6 @@
 # PACKAGE AREA
 
-using JLD2, LibPQ, Dates, DataFrames, CSV
+using JLD2, LibPQ, Dates, DataFrames, CSV, Statistics
 
 #===============================================#
 
@@ -77,7 +77,7 @@ aaveDF.receiveatoken = parse.(BigInt, aaveDF.receiveatoken, base = 16)
 aaveDF.timestamp = parse.(BigInt, aaveDF.timestamp, base = 16)
 
 transform!(aaveDF, :timestamp => ByRow(x -> Dates.format(unix2datetime(x), "mm-dd-yyyy")) => :timestamp)
-
+#=
 #=================================#
 # QUERY 1: daily liquidated collateral amount per liquidator
 #=================================#
@@ -157,50 +157,81 @@ sort!(topLiquidatorTxAmt, [:nrow], rev = true)
 CSV.write(personalPath * "topLiquidatorTxAmt.csv", topLiquidatorTxAmt)
 
 #printData(topLiquidatorTxAmt, 3)
-
-#=
-#=================================#
-# QUERY 5: top miners wrt liquidated collateral amount
-#=================================#
-
-# only look at relevant columns
-
-topMinerAmt = aaveDF[:, [:miner, :liquidatedcollateralamount]]
-
-# group by date, then by miner with respect to the total transactions (i.e. rows) of all liquidatedcollateralamounts
-
-topMinerAmt = combine(groupby(topMinerAmt, :miner), :liquidatedcollateralamount => sum) 
-
-# put in descending order
-
-sort!(topMinerAmt, [:liquidatedcollateralamount_sum], rev = true)
-
-# send to CSV
-
-#CSV.write(personalPath * topMinerAmt * ".csv", topMinerAmt)
-
-printData(topMinerTxAmt, 3)
-
-#=================================#
-# QUERY 6: liquidated collateral amount amount between miners and liquidators
-#=================================#
-
-# only look at relevant columns
-
-topMinerLiquidatorAmt = aaveDF[:, [:liquidator, :miner, :liquidatedcollateralamount]]
-
-# group by liquidator, then by miner with respect to the number of transactions (i.e. rows) of all liquidatedcollateralamounts
-
-topMinerLiquidatorAmt = combine(groupby(topMinerLiquidatorAmt, [:liquidator, :miner]), :liquidatedcollateralamount => sum) 
-
-# put in descending order
-
-sort!(topMinerLiquidatorAmt[:liquidatedcollateralamount_sum], rev = true)
-
-# send to CSV
-
-#CSV.write(personalPath * topMinerLiquidatorAmt * ".csv", topMinerLiquidatorAmt)
-
-printData(topMinerLiquidatorAmt, 3)
 =#
 
+#=================================#
+# QUERY 5: daily liquidated collateral amount per user
+#=================================#
+
+# only look at relevant columns
+
+dailyUserAmt = aaveDF[:, [:timestamp, :user, :liquidatedcollateralamount]]
+
+# group by date, then by user with respect to the total of all liquidatedcollateralamounts
+
+dailyUserAmt = combine(groupby(dailyUserAmt, [:timestamp, :user]), :liquidatedcollateralamount => sum) 
+
+# send to CSV
+
+CSV.write(personalPath * "dailyUserAmt.csv", dailyUserAmt)
+
+#printData(dailyUserAmt, 3)
+
+#=================================#
+# QUERY 6: daily liquidated collateral transaction amount per user
+#=================================#
+
+# only look at relevant columns
+
+dailyUserTxAmt = aaveDF[:, [:timestamp, :user, :liquidatedcollateralamount]]
+
+# group by date, then by user with respect to the total transactions (i.e. rows) of all liquidatedcollateralamounts
+
+dailyUserTxAmt = combine(groupby(dailyUserTxAmt, [:timestamp, :user]), nrow) 
+
+# send to CSV
+
+CSV.write(personalPath * "dailyUserTxAmt.csv", dailyUserTxAmt)
+
+#printData(dailyUserTxAmt, 3)
+
+#=================================#
+# QUERY 7: daily accrued borrow interest and liquidated collateral amount 
+#=================================#
+
+# only look at relevant columns
+
+dailyAccruedLiquid = aaveDF[:, [:timestamp, :accruedborrowinterest, :liquidatedcollateralamount]]
+
+# group by date, then by user with respect to the total of all liquidatedcollateralamounts
+
+dailyAccruedLiquid1 = combine(groupby(dailyAccruedLiquid, :timestamp), :liquidatedcollateralamount => sum) 
+dailyAccruedLiquid2 = combine(groupby(dailyAccruedLiquid, :timestamp), :accruedborrowinterest => mean) 
+
+# send to CSV
+
+CSV.write(personalPath * "dailyAccruedLiquid_LiquidAmt.csv", dailyAccruedLiquid1)
+CSV.write(personalPath * "dailyAccruedLiquid_InterestAmt.csv", dailyAccruedLiquid2)
+
+
+#printData(dailyUserAmt, 3)
+
+#=================================#
+# QUERY 8: daily accrued borrow interest and liquidated collateral transaction amount 
+#=================================#
+
+# only look at relevant columns
+
+dailyAccruedLiquidTx = aaveDF[:, [:timestamp, :accruedborrowinterest, :liquidatedcollateralamount]]
+
+# group by date, then by user with respect to the total of all liquidatedcollateralamounts
+
+dailyAccruedLiquidTx1 = combine(groupby(dailyAccruedLiquidTx, :timestamp), nrow) 
+dailyAccruedLiquidTx2 = combine(groupby(dailyAccruedLiquidTx, :timestamp), :accruedborrowinterest => sum) 
+
+# send to CSV
+
+CSV.write(personalPath * "dailyAccruedLiquidTx_LiquidTxAmt.csv", dailyAccruedLiquidTx1)
+CSV.write(personalPath * "dailyAccruedLiquidTx_InterestAmt.csv", dailyAccruedLiquidTx2)
+
+#printData(dailyUserAmt, 3)
